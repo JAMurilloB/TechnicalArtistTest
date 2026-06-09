@@ -1,0 +1,104 @@
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendEq: add
+          blendSrc: src_alpha
+          blendDst: one
+      rasterizerState:
+        cullMode: none
+      properties:
+        columnColor:   { value: [0.2, 0.5, 1.0, 1.0], editor: { type: color } }
+        columnParams:  { value: [1.0, 2.0, 6.0, 0.3] }
+        columnParams2: { value: [1.0, 0.0, 0.5, 1.0] }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <cc-global>
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec2 uv0;
+  out vec4 v_color;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1.0);
+    pos = cc_matViewProj * pos;
+    uv0 = a_texCoord;
+    v_color = a_color;
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  #include <cc-global>
+
+  in vec2 uv0;
+  in vec4 v_color;
+
+  uniform ColumnUniforms {
+    vec4 columnColor;
+    vec4 columnParams;
+    vec4 columnParams2;
+  };
+
+  vec4 frag () {
+    float glowStrength = columnParams.x;
+    float raySpeed     = columnParams.y;
+    float rayCount     = columnParams.z;
+    float edgeFeather  = columnParams.w;
+
+    float distortion   = columnParams2.x;
+    float lineStrength = columnParams2.y;
+    float lineCount    = columnParams2.z;
+    float direction    = columnParams2.w;
+
+    // Tiempo en bucle — evita pérdida de precisión
+    float tBase = fract(cc_time.x * 0.01) * 100.0;
+    float t     = tBase * raySpeed * direction;
+
+    // Distorsión animada — tres ondas con velocidades distintas para que nunca repita patrón
+    float d1 = sin(uv0.y * 3.0  + tBase * 0.7)  * 0.015;
+    float d2 = sin(uv0.y * 7.0  - tBase * 1.1)  * 0.010;
+    float d3 = sin(uv0.y * 13.0 + tBase * 0.4)  * 0.005;
+    float uvDistort = (d1 + d2 + d3) * distortion;
+    float ux = uv0.x + uvDistort;
+
+    // Máscara de columna
+    float centerX    = abs(ux - 0.5) * 2.0;
+    float columnMask = 1.0 - smoothstep(1.0 - edgeFeather, 1.0, centerX);
+
+    // Franjas
+    float ray1 = 0.5 + 0.5 * sin(uv0.y * rayCount       - t * 1.0  + ux * 3.0);
+    float ray2 = 0.5 + 0.5 * sin(uv0.y * rayCount * 1.7 - t * 1.3  + ux * 5.0);
+    float ray3 = 0.5 + 0.5 * sin(uv0.y * rayCount * 2.3 - t * 0.8  + ux * 7.0);
+    float rays = pow(ray1 * 0.5 + ray2 * 0.3 + ray3 * 0.2, 2.5);
+
+    // Líneas verticales opcionales
+    float lines = 0.0;
+    if (lineStrength > 0.01) {
+      float linePattern = abs(sin(ux * lineCount * 3.14159));
+      lines = pow(linePattern, 4.0) * lineStrength;
+    }
+
+    // Fade inferior y superior
+    float fadeBottom = smoothstep(0.0, 0.15, uv0.y);
+    float fadeTop    = smoothstep(1.0, 0.6,  uv0.y);
+
+    float finalAlpha = (rays + lines) * columnMask * fadeBottom * fadeTop * glowStrength * v_color.a;
+    finalAlpha = clamp(finalAlpha, 0.0, 1.0);
+
+    return vec4(columnColor.rgb, finalAlpha);
+  }
+}%

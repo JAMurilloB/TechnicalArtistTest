@@ -1,0 +1,88 @@
+CCEffect %{
+  techniques:
+  - passes:
+    - vert: sprite-vs:vert
+      frag: sprite-fs:frag
+      depthStencilState:
+        depthTest: false
+        depthWrite: false
+      blendState:
+        targets:
+        - blend: true
+          blendEq: add
+          blendSrc: one
+          blendDst: one_minus_src_alpha
+          blendSrcAlpha: one
+          blendDstAlpha: one_minus_src_alpha
+      rasterizerState:
+        cullMode: none
+      properties:
+        # Ahora los sliders van de 0 a 100 con pasos muy finos
+        blackThreshold: { value: 15.0, editor: { range: [0.0, 100.0], slide: true, step: 0.1 } }
+        smoothness: { value: 25.0, editor: { range: [0.0, 100.0], slide: true, step: 0.1 } }
+}%
+
+CCProgram sprite-vs %{
+  precision highp float;
+  #include <cc-global>
+  
+  #if USE_LOCAL
+    #include <cc-local>
+  #endif
+
+  in vec3 a_position;
+  in vec2 a_texCoord;
+  in vec4 a_color;
+
+  out vec4 color;
+  out vec2 uv0;
+
+  vec4 vert () {
+    vec4 pos = vec4(a_position, 1.0);
+
+    #if USE_LOCAL
+      pos = cc_matWorld * pos;
+    #endif
+
+    pos = cc_matViewProj * pos;
+
+    uv0 = a_texCoord;
+    color = a_color;
+
+    return pos;
+  }
+}%
+
+CCProgram sprite-fs %{
+  precision highp float;
+  
+  in vec4 color;
+  in vec2 uv0;
+
+  #pragma builtin(local)
+  layout(set = 2, binding = 12) uniform sampler2D cc_spriteTexture;
+
+  uniform BlackKeyParams {
+    float blackThreshold;
+    float smoothness;
+  };
+
+  vec4 frag () {
+    vec4 texColor = texture(cc_spriteTexture, uv0);
+    
+    // --- ESCALADO PARA EL EDITOR ---
+    // Multiplicamos tu valor (ej: 15.0) por 0.002 para convertirlo en el microscópico 0.03 de la GPU
+    float realThreshold = blackThreshold * 0.002;
+    float realSmoothness = smoothness * 0.002;
+    
+    float maxColor = max(max(texColor.r, texColor.g), texColor.b);
+    float alpha = smoothstep(realThreshold, realThreshold + realSmoothness, maxColor);
+    
+    vec3 finalRGB = texColor.rgb;
+    if (alpha <= 0.001) {
+        finalRGB = vec3(0.0);
+    }
+    
+    return vec4(finalRGB * color.rgb * color.a, alpha * color.a);
+  }
+}%
