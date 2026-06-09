@@ -62,6 +62,14 @@ El movimiento del Player activa el parallax del fondo.
 La capa Sprite del Player contiene las animaciones y el mismo Material y Shader para eliminar el fondo negro y generar la transparencia.
 La UI contiene el Prefab del BackButton.
 
-Nota-Bonus: se han convertido las animaciones de la Key y el Player a .jpg para luego aplicar un material y shader que eliminan el fondo negro.
-Nota-Bonus: se ha optmizado la imagen VIKING.png convirtiéndola a .jpg
+Bonus: se han convertido las animaciones de la Key y el Player a .jpg para luego aplicar un material y shader que eliminan el fondo negro.
+Bonus: se ha optmizado la imagen VIKING.png convirtiéndola a .jpg
+
+Nota:
+Se ha empleado la IA para crear scripts y shaders.
+Se ha empleado la IA para crear un .py para optimizar el VIKING.png
+Se añade enlace para probar directamente el Test desde GitHub
+
+https://jamurillob.github.io/TechnicalArtistTest/
+
 
